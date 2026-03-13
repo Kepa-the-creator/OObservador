@@ -1,29 +1,67 @@
-const activeWin = require('active-win');
+const si = require('systeminformation');
+const io = require('socket.io-client');
 const psList = require('ps-list');
 
-async function monitorarAtividade() {
-    try {
-        // 1. Pega a janela que está na cara do usuário agora
-        const window = await activeWin();
-        
-        // 2. Pega os processos que estão usando mais memória (arquivos/apps abertos)
-        const processes = await psList();
-        const topApps = processes
-            .filter(p => p.cpu > 0.5 || p.memory > 1) // Filtra só o que está "vivo"
-            .map(p => p.name)
-            .slice(0, 5); // Pega os 5 principais
+// ALTERE PARA O SEU IP ATUAL (Dê um ipconfig no seu PC principal)
+const SERVER_URL = 'http://192.168.0.102:3000'; 
+const socket = io(SERVER_URL);
 
-        const atividade = {
-            id: (await si.osInfo()).hostname,
-            janelaAtiva: window ? `${window.title} (${window.owner.name})` : "Nenhuma",
-            appsAbertos: [...new Set(topApps)].join(", ") // Remove duplicados
+async function coletarTudo() {
+    try {
+        // Coleta de Hardware e Rede
+        const [cpu, mem, battery, os, net, wifi] = await Promise.all([
+            si.currentLoad(),
+            si.mem(),
+            si.battery(),
+            si.osInfo(),
+            si.networkStats(),
+            si.wifiConnections()
+        ]);
+
+        // Coleta de Processos (Substituindo a janela ativa que dava erro)
+        let topApps = "---";
+        try {
+            const processes = await psList();
+            topApps = processes
+                .filter(p => p.cpu > 1 || p.memory > 5) // Filtra apps ativos
+                .map(p => p.name)
+                .slice(0, 5)
+                .join(", ");
+        } catch (e) {
+            topApps = "Erro ao listar apps";
+        }
+
+        const payload = {
+            id: os.hostname,
+            cpuUsage: cpu.currentLoad.toFixed(1),
+            ramUsage: ((mem.active / mem.total) * 100).toFixed(1),
+            
+            // Rede
+            netDownload: (net[0].rx_sec / 1024 / 1024).toFixed(1) + 'M',
+            netUpload: (net[0].tx_sec / 1024 / 1024).toFixed(1) + 'M',
+            wifiSsid: wifi[0]?.ssid || 'Cabo/Desconectado',
+            wifiSignal: wifi[0]?.signalLevel || 0,
+
+            // Bateria
+            batteryLevel: battery.percent,
+            batteryHealth: battery.capacityUnit || 'N/A',
+
+            // Atividade (Simplificada para não dar erro de ffi-napi)
+            janelaAtiva: "Monitoramento Ativo", 
+            appsAbertos: topApps
         };
 
-        socket.emit('activity_update', atividade);
-    } catch (err) {
-        console.error("Erro ao monitorar atividade:", err);
+        socket.emit('vitals_update', payload);
+        console.log(`[${new Date().toLocaleTimeString()}] Dados enviados para o servidor.`);
+
+    } catch (error) {
+        console.error("Erro na coleta:", error);
     }
 }
 
-// Chame a função no seu intervalo
-setInterval(monitorarAtividade, 5000); // Checa a cada 5 segundos
+// Envia dados a cada 5 segundos
+setInterval(coletarTudo, 5000);
+coletarTudo();
+
+socket.on('connect', () => console.log("✅ Conectado ao Servidor Central!"));
+socket.on('connect_error', (err) => console.log("❌ Erro de conexão: Verifique o IP do Servidor"));
