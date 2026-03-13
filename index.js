@@ -2,13 +2,13 @@ const si = require('systeminformation');
 const io = require('socket.io-client');
 const psList = require('ps-list');
 
-// ALTERE PARA O SEU IP ATUAL (Dê um ipconfig no seu PC principal)
-const SERVER_URL = 'http://192.168.18.150:3000'; 
+// ⚠️ IMPORTANTE: Coloque aqui o IP do seu PC Principal (visto no ipconfig)
+const SERVER_URL = 'http://192.168.0.102:3000'; 
 const socket = io(SERVER_URL);
 
 async function coletarTudo() {
     try {
-        // Coleta de Hardware e Rede
+        // 1. Coleta de Hardware e Sistema
         const [cpu, mem, battery, os, net, wifi] = await Promise.all([
             si.currentLoad(),
             si.mem(),
@@ -18,50 +18,67 @@ async function coletarTudo() {
             si.wifiConnections()
         ]);
 
-        // Coleta de Processos (Substituindo a janela ativa que dava erro)
-        let topApps = "---";
+        // 2. Coleta de Processos (Apps Abertos)
+        let topApps = "Apenas processos de fundo";
         try {
             const processes = await psList();
-            topApps = processes
-                .filter(p => p.cpu > 1 || p.memory > 5) // Filtra apps ativos
-                .map(p => p.name)
-                .slice(0, 5)
-                .join(", ");
+            
+            // Filtro sensível: Pega apps que o usuário realmente está usando
+            const filtrados = processes
+                .filter(p => p.cpu > 0.1 || p.memory > 0.5) // Pega quase tudo que está "vivo"
+                .sort((a, b) => b.cpu - a.cpu) // O que consome mais CPU fica no topo
+                .map(p => p.name.replace('.exe', '')) // Limpa o nome do arquivo
+                .filter(name => !['svchost', 'System', 'Idle', 'Registry'].includes(name)) // Remove lixo do sistema
+                .slice(0, 8); // Pega os 8 principais
+
+            if (filtrados.length > 0) {
+                topApps = [...new Set(filtrados)].join(", "); // Remove duplicados e junta em texto
+            }
         } catch (e) {
-            topApps = "Erro ao listar apps";
+            topApps = "Sem permissão para listar apps";
         }
 
+        // 3. Montagem do Pacote de Dados (Payload)
         const payload = {
             id: os.hostname,
             cpuUsage: cpu.currentLoad.toFixed(1),
             ramUsage: ((mem.active / mem.total) * 100).toFixed(1),
             
-            // Rede
+            // Rede e Wi-Fi
             netDownload: (net[0].rx_sec / 1024 / 1024).toFixed(1) + 'M',
             netUpload: (net[0].tx_sec / 1024 / 1024).toFixed(1) + 'M',
-            wifiSsid: wifi[0]?.ssid || 'Cabo/Desconectado',
-            wifiSignal: wifi[0]?.signalLevel || 0,
+            wifiSsid: wifi[0]?.ssid || 'Conectado via Cabo',
+            wifiSignal: wifi[0]?.signalLevel || 100,
 
             // Bateria
             batteryLevel: battery.percent,
-            batteryHealth: battery.capacityUnit || 'N/A',
+            isCharging: battery.isCharging,
 
-            // Atividade (Simplificada para não dar erro de ffi-napi)
-            janelaAtiva: "Monitoramento Ativo", 
+            // Atividade Atual
+            janelaAtiva: "Monitoramento em Tempo Real", 
             appsAbertos: topApps
         };
 
+        // 4. Envio para o seu Servidor
         socket.emit('vitals_update', payload);
-        console.log(`[${new Date().toLocaleTimeString()}] Dados enviados para o servidor.`);
+        console.log(`[${new Date().toLocaleTimeString()}] ✅ Dados enviados! Apps: ${topApps.substring(0, 30)}...`);
 
     } catch (error) {
-        console.error("Erro na coleta:", error);
+        console.error("❌ Erro na coleta de dados:", error.message);
     }
 }
 
-// Envia dados a cada 5 segundos
-setInterval(coletarTudo, 5000);
-coletarTudo();
+// Configurações do Socket
+socket.on('connect', () => {
+    console.log("-----------------------------------------");
+    console.log("📡 CONECTADO AO SERVIDOR CENTRAL (AYLEEN)");
+    console.log("-----------------------------------------");
+});
 
-socket.on('connect', () => console.log("✅ Conectado ao Servidor Central!"));
-socket.on('connect_error', (err) => console.log("❌ Erro de conexão: Verifique o IP do Servidor"));
+socket.on('connect_error', () => {
+    console.log("⚠️ Tentando encontrar o servidor no IP: " + SERVER_URL);
+});
+
+// Inicia o loop: Envia dados a cada 5 segundos
+setInterval(coletarTudo, 5000);
+coletarTudo(); // Primeira execução imediata
