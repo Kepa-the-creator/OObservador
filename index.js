@@ -3,7 +3,7 @@ const io = require('socket.io-client');
 const psList = require('ps-list');
 
 // ALTERE PARA O SEU IP ATUAL (Dê um ipconfig no seu PC principal)
-const SERVER_URL = 'http://192.168.0.102:3000'; 
+const SERVER_URL = 'http://192.168.18.150:3000'; 
 const socket = io(SERVER_URL);
 
 async function coletarTudo() {
