@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "server", "start"],
+      "port": 3000
+    },
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "dashboard", "run", "dev", "--", "-p", "3002"],
+      "port": 3002
+    }
+  ]
+}
