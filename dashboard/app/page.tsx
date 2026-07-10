@@ -9,12 +9,29 @@ type Device = {
     cpu_usage: number;
     ram_usage: number;
     battery_level: number;
+    is_charging: boolean;
     apps_abertos: string;
     status: 'ONLINE' | 'OFFLINE';
+    last_seen: string;
 };
+
+function barClass(value: number) {
+    if (value >= 85) return 'metric-fill danger';
+    if (value >= 65) return 'metric-fill warn';
+    return 'metric-fill';
+}
+
+function timeAgo(iso: string) {
+    const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+    if (seconds < 60) return `há ${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `há ${minutes}min`;
+    return `há ${Math.floor(minutes / 60)}h`;
+}
 
 export default function Dashboard() {
     const [devices, setDevices] = useState<Device[]>([]);
+    const [, forceTick] = useState(0);
     const router = useRouter();
 
     useEffect(() => {
@@ -24,7 +41,11 @@ export default function Dashboard() {
         }
         load();
         const interval = setInterval(load, 2000);
-        return () => clearInterval(interval);
+        const clock = setInterval(() => forceTick((t) => t + 1), 1000);
+        return () => {
+            clearInterval(interval);
+            clearInterval(clock);
+        };
     }, []);
 
     async function handleLogout() {
@@ -33,45 +54,75 @@ export default function Dashboard() {
         router.push('/login');
     }
 
+    const onlineCount = devices.filter((d) => d.status === 'ONLINE').length;
+
     return (
-        <main style={{ fontFamily: 'monospace', padding: 24, background: '#0b0b0b', color: '#eee', minHeight: '100vh' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h1>OObservador — Dashboard</h1>
-                <button
-                    onClick={handleLogout}
-                    style={{ padding: '6px 12px', background: '#1a1a1a', color: '#eee', border: '1px solid #333', cursor: 'pointer' }}
-                >
-                    Sair
-                </button>
+        <div className="page">
+            <div className="header">
+                <div>
+                    <div className="brand">
+                        <span className="brand-dot" />
+                        <h1>OObservador</h1>
+                    </div>
+                    <p className="subtitle">Monitoramento em tempo real</p>
+                </div>
+                <button className="btn" onClick={handleLogout}>Sair</button>
             </div>
-            <p>{devices.length} dispositivo(s)</p>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                    <tr style={{ textAlign: 'left', borderBottom: '1px solid #333' }}>
-                        <th>Status</th>
-                        <th>ID</th>
-                        <th>CPU%</th>
-                        <th>RAM%</th>
-                        <th>Bateria%</th>
-                        <th>Apps Abertos</th>
-                    </tr>
-                </thead>
-                <tbody>
+
+            <div className="summary-bar">
+                <div className="summary-pill"><strong>{devices.length}</strong> dispositivo(s)</div>
+                <div className="summary-pill"><strong>{onlineCount}</strong> online</div>
+            </div>
+
+            {devices.length === 0 ? (
+                <div className="empty-state">Aguardando conexão de agentes...</div>
+            ) : (
+                <div className="grid">
                     {devices.map((d) => (
-                        <tr key={d.id} style={{ borderBottom: '1px solid #222' }}>
-                            <td>{d.status === 'ONLINE' ? '🟢 ON' : '🔴 OFF'}</td>
-                            <td>{d.id}</td>
-                            <td>{d.cpu_usage}</td>
-                            <td>{d.ram_usage}</td>
-                            <td>{d.battery_level}</td>
-                            <td>{d.apps_abertos}</td>
-                        </tr>
+                        <div className="card" key={d.id}>
+                            <div className="card-top">
+                                <span className="device-id">{d.id}</span>
+                                <span className={`badge ${d.status === 'ONLINE' ? 'badge-online' : 'badge-offline'}`}>
+                                    <span className="badge-dot" />
+                                    {d.status === 'ONLINE' ? 'Online' : 'Offline'}
+                                </span>
+                            </div>
+
+                            <div className="metrics">
+                                <div className="metric-row">
+                                    <span className="metric-label">CPU</span>
+                                    <div className="metric-bar">
+                                        <div className={barClass(d.cpu_usage)} style={{ width: `${Math.min(100, d.cpu_usage)}%` }} />
+                                    </div>
+                                    <span className="metric-value">{d.cpu_usage}%</span>
+                                </div>
+                                <div className="metric-row">
+                                    <span className="metric-label">RAM</span>
+                                    <div className="metric-bar">
+                                        <div className={barClass(d.ram_usage)} style={{ width: `${Math.min(100, d.ram_usage)}%` }} />
+                                    </div>
+                                    <span className="metric-value">{d.ram_usage}%</span>
+                                </div>
+                                <div className="battery-row">
+                                    {d.is_charging ? '⚡' : '🔋'} Bateria {d.battery_level}%
+                                </div>
+                            </div>
+
+                            <div className="chips">
+                                {d.apps_abertos
+                                    ? d.apps_abertos.split(', ').map((app) => (
+                                        <span className="chip" key={app}>{app}</span>
+                                    ))
+                                    : <span className="chip">Área de Trabalho</span>}
+                            </div>
+
+                            <div className="card-footer">
+                                Atualizado {timeAgo(d.last_seen)}
+                            </div>
+                        </div>
                     ))}
-                    {devices.length === 0 && (
-                        <tr><td colSpan={6}>Aguardando conexão de agentes...</td></tr>
-                    )}
-                </tbody>
-            </table>
-        </main>
+                </div>
+            )}
+        </div>
     );
 }
