@@ -10,6 +10,7 @@ create table if not exists devices (
     is_charging boolean,
     janela_ativa text,
     apps_abertos text,
+    tag text,
     last_seen timestamptz not null default now()
 );
 

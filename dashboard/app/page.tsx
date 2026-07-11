@@ -13,7 +13,72 @@ type Device = {
     apps_abertos: string;
     status: 'ONLINE' | 'OFFLINE';
     last_seen: string;
+    tag: string | null;
 };
+
+function TagEditor({
+    deviceId,
+    tag,
+    onSaved
+}: {
+    deviceId: string;
+    tag: string | null;
+    onSaved: (tag: string | null) => void;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState(tag ?? '');
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        setValue(tag ?? '');
+    }, [tag]);
+
+    async function save() {
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/devices/${deviceId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tag: value })
+            });
+            if (res.ok) {
+                const updated = await res.json();
+                onSaved(updated.tag);
+            }
+        } finally {
+            setSaving(false);
+            setEditing(false);
+        }
+    }
+
+    if (editing) {
+        return (
+            <input
+                className="tag-input"
+                value={value}
+                autoFocus
+                disabled={saving}
+                placeholder="ex: Casa"
+                maxLength={40}
+                onChange={(e) => setValue(e.target.value)}
+                onBlur={save}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.currentTarget.blur();
+                    if (e.key === 'Escape') {
+                        setValue(tag ?? '');
+                        setEditing(false);
+                    }
+                }}
+            />
+        );
+    }
+
+    return (
+        <button className="tag-pill" onClick={() => setEditing(true)} title="Clique para editar a tag">
+            {tag || '+ tag'}
+        </button>
+    );
+}
 
 function barClass(value: number) {
     if (value >= 85) return 'metric-fill danger';
@@ -54,6 +119,10 @@ export default function Dashboard() {
         router.push('/login');
     }
 
+    function updateDeviceTag(id: string, tag: string | null) {
+        setDevices((prev) => prev.map((d) => (d.id === id ? { ...d, tag } : d)));
+    }
+
     const onlineCount = devices.filter((d) => d.status === 'ONLINE').length;
 
     return (
@@ -81,7 +150,10 @@ export default function Dashboard() {
                     {devices.map((d) => (
                         <div className="card" key={d.id}>
                             <div className="card-top">
-                                <span className="device-id">{d.id}</span>
+                                <div className="device-id-row">
+                                    <span className="device-id">{d.id}</span>
+                                    <TagEditor deviceId={d.id} tag={d.tag} onSaved={(tag) => updateDeviceTag(d.id, tag)} />
+                                </div>
                                 <span className={`badge ${d.status === 'ONLINE' ? 'badge-online' : 'badge-offline'}`}>
                                     <span className="badge-dot" />
                                     {d.status === 'ONLINE' ? 'Online' : 'Offline'}
