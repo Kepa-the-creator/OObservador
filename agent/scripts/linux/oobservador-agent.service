@@ -1,0 +1,14 @@
+[Unit]
+Description=OObservador Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/oobservador/oobservador-agent
+WorkingDirectory=%h/.local/share/oobservador
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
