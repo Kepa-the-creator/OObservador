@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { evaluateSustainedAlerts } from '@/lib/alerts';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +63,12 @@ export async function POST(req: NextRequest) {
 
     if (metricsError) console.error('metrics insert:', metricsError);
     if (cleanupError) console.error('metrics cleanup:', cleanupError);
+
+    try {
+        await evaluateSustainedAlerts(admin, payload.id);
+    } catch (alertError) {
+        console.error('alert evaluation:', alertError);
+    }
 
     return new NextResponse(null, { status: 204 });
 }

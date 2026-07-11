@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
@@ -16,6 +16,15 @@ type Device = {
     status: 'ONLINE' | 'OFFLINE';
     last_seen: string;
     tag: string | null;
+};
+
+type Alert = {
+    id: number;
+    device_id: string;
+    type: string;
+    message: string;
+    created_at: string;
+    resolved_at: string | null;
 };
 
 function TagEditor({
@@ -175,16 +184,40 @@ function formatUptime(seconds: number) {
     return `${minutes}min ligado`;
 }
 
+function reportOfflineTransition(deviceId: string, wentOffline: boolean) {
+    fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+            wentOffline
+                ? { deviceId, type: 'offline', message: 'Ficou offline' }
+                : { deviceId, type: 'offline', resolve: true }
+        )
+    }).catch(() => {});
+}
+
 export default function Dashboard() {
     const [devices, setDevices] = useState<Device[]>([]);
+    const [alerts, setAlerts] = useState<Alert[]>([]);
     const [filter, setFilter] = useState<string>('all');
     const [, forceTick] = useState(0);
     const router = useRouter();
+    const previousStatusRef = useRef<Record<string, 'ONLINE' | 'OFFLINE'>>({});
 
     useEffect(() => {
         async function load() {
             const res = await fetch('/api/devices');
-            if (res.ok) setDevices(await res.json());
+            if (!res.ok) return;
+            const data: Device[] = await res.json();
+            setDevices(data);
+
+            for (const d of data) {
+                const prev = previousStatusRef.current[d.id];
+                if (prev && prev !== d.status) {
+                    reportOfflineTransition(d.id, d.status === 'OFFLINE');
+                }
+                previousStatusRef.current[d.id] = d.status;
+            }
         }
         load();
         const interval = setInterval(load, 2000);
@@ -193,6 +226,16 @@ export default function Dashboard() {
             clearInterval(interval);
             clearInterval(clock);
         };
+    }, []);
+
+    useEffect(() => {
+        async function loadAlerts() {
+            const res = await fetch('/api/alerts');
+            if (res.ok) setAlerts(await res.json());
+        }
+        loadAlerts();
+        const interval = setInterval(loadAlerts, 8000);
+        return () => clearInterval(interval);
     }, []);
 
     async function handleLogout() {
@@ -207,6 +250,7 @@ export default function Dashboard() {
 
     const onlineCount = devices.filter((d) => d.status === 'ONLINE').length;
     const offlineCount = devices.length - onlineCount;
+    const activeAlertsCount = alerts.filter((a) => !a.resolved_at).length;
     const tags = Array.from(
         new Set(devices.map((d) => d.tag).filter((t): t is string => Boolean(t)))
     ).sort((a, b) => a.localeCompare(b));
@@ -234,7 +278,26 @@ export default function Dashboard() {
             <div className="summary-bar">
                 <div className="summary-pill"><strong>{devices.length}</strong> dispositivo(s)</div>
                 <div className="summary-pill"><strong>{onlineCount}</strong> online</div>
+                <div className="summary-pill"><strong>{activeAlertsCount}</strong> alerta(s) ativo(s)</div>
             </div>
+
+            {alerts.length > 0 && (
+                <div className="panel">
+                    <div className="panel-head">
+                        <h2>Atividade recente</h2>
+                    </div>
+                    {alerts.map((a) => (
+                        <div className="alert-row" key={a.id}>
+                            <span className={`alert-dot ${a.type === 'offline' ? 'bad' : ''}`} />
+                            <span className={`alert-msg ${a.resolved_at ? 'resolved' : ''}`}>
+                                <b>{a.device_id}</b> — {a.message}
+                                {a.resolved_at ? ' (resolvido)' : ''}
+                            </span>
+                            <span className="alert-when">{timeAgo(a.created_at)}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {devices.length > 0 && (
                 <div className="filter-bar">
