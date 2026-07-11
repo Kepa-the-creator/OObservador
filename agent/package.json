@@ -6,7 +6,7 @@
   "bin": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "build:exe": "pkg . --targets node22-win-x64 --output dist/oobservador-agent.exe && node -e \"require('fs').cpSync('scripts', 'dist', { recursive: true })\"",
+    "build:exe": "pkg . --targets node22-win-x64 --output dist/bin/oobservador-agent.exe && node -e \"const fs=require('fs'); fs.cpSync('scripts/INSTALAR.vbs','dist/INSTALAR.vbs'); fs.cpSync('scripts/DESINSTALAR.vbs','dist/DESINSTALAR.vbs'); fs.cpSync('scripts/bin/run-hidden.vbs','dist/bin/run-hidden.vbs')\"",
     "build:exe:linux": "pkg . --targets node22-linux-x64 --output dist-linux/oobservador-agent && node -e \"require('fs').cpSync('scripts/linux', 'dist-linux', { recursive: true }); require('fs').chmodSync('dist-linux/instalar.sh', 0o755); require('fs').chmodSync('dist-linux/desinstalar.sh', 0o755)\""
   },
   "license": "ISC",
