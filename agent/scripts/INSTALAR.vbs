@@ -17,6 +17,13 @@ If Not fso.FileExists(exePath) Then
     WScript.Quit 1
 End If
 
+' Remove a marca "veio da internet" (Mark of the Web) dos arquivos, senao
+' o Windows pede confirmacao toda vez que tenta rodar isso sozinho no login
+' - o que trava a inicializacao automatica exatamente no que nao pode
+' travar. Precisa disso porque os arquivos chegaram aqui via download/
+' zip/e-mail/nuvem.
+shell.Run "powershell -NoProfile -WindowStyle Hidden -Command ""Get-ChildItem -LiteralPath '" & scriptDir & "' -Recurse -File | Unblock-File""", 0, True
+
 startupFolder = shell.SpecialFolders("Startup")
 
 Set shortcut = shell.CreateShortcut(startupFolder & "\OObservador.lnk")
