@@ -96,6 +96,7 @@ function timeAgo(iso: string) {
 
 export default function Dashboard() {
     const [devices, setDevices] = useState<Device[]>([]);
+    const [filter, setFilter] = useState<string>('all');
     const [, forceTick] = useState(0);
     const router = useRouter();
 
@@ -124,6 +125,17 @@ export default function Dashboard() {
     }
 
     const onlineCount = devices.filter((d) => d.status === 'ONLINE').length;
+    const offlineCount = devices.length - onlineCount;
+    const tags = Array.from(
+        new Set(devices.map((d) => d.tag).filter((t): t is string => Boolean(t)))
+    ).sort((a, b) => a.localeCompare(b));
+
+    const filteredDevices = devices.filter((d) => {
+        if (filter === 'all') return true;
+        if (filter === 'online') return d.status === 'ONLINE';
+        if (filter === 'offline') return d.status === 'OFFLINE';
+        return d.tag === filter;
+    });
 
     return (
         <div className="page">
@@ -143,11 +155,32 @@ export default function Dashboard() {
                 <div className="summary-pill"><strong>{onlineCount}</strong> online</div>
             </div>
 
+            {devices.length > 0 && (
+                <div className="filter-bar">
+                    <button className={`filter-chip ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
+                        Todos <span className="n">{devices.length}</span>
+                    </button>
+                    <button className={`filter-chip ${filter === 'online' ? 'active' : ''}`} onClick={() => setFilter('online')}>
+                        Online <span className="n">{onlineCount}</span>
+                    </button>
+                    <button className={`filter-chip ${filter === 'offline' ? 'active' : ''}`} onClick={() => setFilter('offline')}>
+                        Offline <span className="n">{offlineCount}</span>
+                    </button>
+                    {tags.map((t) => (
+                        <button key={t} className={`filter-chip ${filter === t ? 'active' : ''}`} onClick={() => setFilter(t)}>
+                            {t} <span className="n">{devices.filter((d) => d.tag === t).length}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {devices.length === 0 ? (
                 <div className="empty-state">Aguardando conexão de agentes...</div>
+            ) : filteredDevices.length === 0 ? (
+                <div className="empty-state">Nenhum dispositivo nesse filtro.</div>
             ) : (
                 <div className="grid">
-                    {devices.map((d) => (
+                    {filteredDevices.map((d) => (
                         <div className="card" key={d.id}>
                             <div className="card-top">
                                 <div className="device-id-row">
