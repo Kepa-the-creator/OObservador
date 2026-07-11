@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
         hostname: payload.hostname,
         cpu_usage: payload.cpuUsage,
         ram_usage: payload.ramUsage,
+        disk_usage: payload.diskUsage,
+        uptime_seconds: payload.uptimeSeconds,
         net_download: payload.netDownload,
         net_upload: payload.netUpload,
         wifi_ssid: payload.wifiSsid,

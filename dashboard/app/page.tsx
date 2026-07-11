@@ -8,6 +8,8 @@ type Device = {
     id: string;
     cpu_usage: number;
     ram_usage: number;
+    disk_usage: number | null;
+    uptime_seconds: number | null;
     battery_level: number;
     is_charging: boolean;
     apps_abertos: string;
@@ -92,6 +94,15 @@ function timeAgo(iso: string) {
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `há ${minutes}min`;
     return `há ${Math.floor(minutes / 60)}h`;
+}
+
+function formatUptime(seconds: number) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (days > 0) return `${days}d ${hours}h ligado`;
+    if (hours > 0) return `${hours}h ${minutes}min ligado`;
+    return `${minutes}min ligado`;
 }
 
 export default function Dashboard() {
@@ -193,6 +204,10 @@ export default function Dashboard() {
                                 </span>
                             </div>
 
+                            {d.uptime_seconds != null && (
+                                <div className="uptime-row">{formatUptime(d.uptime_seconds)}</div>
+                            )}
+
                             <div className="metrics">
                                 <div className="metric-row">
                                     <span className="metric-label">CPU</span>
@@ -208,6 +223,15 @@ export default function Dashboard() {
                                     </div>
                                     <span className="metric-value">{d.ram_usage}%</span>
                                 </div>
+                                {d.disk_usage != null && (
+                                    <div className="metric-row">
+                                        <span className="metric-label">Disco</span>
+                                        <div className="metric-bar">
+                                            <div className={barClass(d.disk_usage)} style={{ width: `${Math.min(100, d.disk_usage)}%` }} />
+                                        </div>
+                                        <span className="metric-value">{d.disk_usage}%</span>
+                                    </div>
+                                )}
                                 <div className="battery-row">
                                     {d.is_charging ? '⚡' : '🔋'} Bateria {d.battery_level}%
                                 </div>

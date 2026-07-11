@@ -264,6 +264,12 @@ html, body {
     box-shadow: 0 0 6px 1px var(--online);
 }
 
+.uptime-row {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+}
+
 .metrics {
     display: flex;
     flex-direction: column;

@@ -3,6 +3,8 @@ create table if not exists devices (
     hostname text,
     cpu_usage numeric,
     ram_usage numeric,
+    disk_usage numeric,
+    uptime_seconds bigint,
     net_download text,
     net_upload text,
     wifi_ssid text,

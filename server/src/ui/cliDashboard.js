@@ -14,7 +14,7 @@ function render(deviceManager) {
     console.log("=================== OObservador - Dashboard ===================");
     console.log(`Atualizado em: ${new Date().toLocaleTimeString()} | Dispositivos: ${devices.length}`);
     console.log("-----------------------------------------------------------------");
-    console.log(pad("STATUS", 9) + pad("ID", 16) + pad("CPU%", 7) + pad("RAM%", 7) + pad("BAT%", 6) + "APPS ABERTOS");
+    console.log(pad("STATUS", 9) + pad("ID", 16) + pad("CPU%", 7) + pad("RAM%", 7) + pad("DISK%", 7) + pad("BAT%", 6) + "APPS ABERTOS");
     console.log("-----------------------------------------------------------------");
 
     if (devices.length === 0) {
@@ -28,6 +28,7 @@ function render(deviceManager) {
             pad(device.id, 16) +
             pad(device.cpuUsage, 7) +
             pad(device.ramUsage, 7) +
+            pad(device.diskUsage, 7) +
             pad(device.batteryLevel, 6) +
             (device.appsAbertos || '')
         );
