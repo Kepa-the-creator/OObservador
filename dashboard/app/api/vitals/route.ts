@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 export const dynamic = 'force-dynamic';
 
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
+const METRICS_RETENTION_MS = 60 * 60 * 1000; // 1 hora de histórico
 
 export async function POST(req: NextRequest) {
     const auth = req.headers.get('authorization') || '';
@@ -18,7 +19,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'missing id' }, { status: 400 });
     }
 
-    const { error } = await getSupabaseAdmin().from('devices').upsert({
+    const admin = getSupabaseAdmin();
+
+    const { error } = await admin.from('devices').upsert({
         id: payload.id,
         hostname: payload.hostname,
         cpu_usage: payload.cpuUsage,
@@ -39,6 +42,26 @@ export async function POST(req: NextRequest) {
         console.error(error);
         return NextResponse.json({ error: 'db error' }, { status: 500 });
     }
+
+    // Histórico para os gráficos - aguardamos (funções serverless podem
+    // congelar assim que a resposta é enviada, então "disparar e esquecer"
+    // arriscaria perder a escrita). Falha aqui não derruba a resposta, o
+    // status ao vivo (upsert acima) é o que importa de verdade.
+    const [{ error: metricsError }, { error: cleanupError }] = await Promise.all([
+        admin.from('device_metrics').insert({
+            device_id: payload.id,
+            cpu_usage: payload.cpuUsage,
+            ram_usage: payload.ramUsage,
+            disk_usage: payload.diskUsage
+        }),
+        admin.from('device_metrics')
+            .delete()
+            .eq('device_id', payload.id)
+            .lt('recorded_at', new Date(Date.now() - METRICS_RETENTION_MS).toISOString())
+    ]);
+
+    if (metricsError) console.error('metrics insert:', metricsError);
+    if (cleanupError) console.error('metrics cleanup:', cleanupError);
 
     return new NextResponse(null, { status: 204 });
 }

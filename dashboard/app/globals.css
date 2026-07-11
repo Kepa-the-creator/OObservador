@@ -270,6 +270,31 @@ html, body {
     margin-bottom: 12px;
 }
 
+.spark-wrap {
+    margin-bottom: 12px;
+}
+
+.spark-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: var(--text-dim);
+    margin-bottom: 3px;
+}
+
+.spark-label b {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.spark-empty {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
 .metrics {
     display: flex;
     flex-direction: column;

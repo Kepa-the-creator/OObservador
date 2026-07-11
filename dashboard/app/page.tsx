@@ -88,6 +88,76 @@ function barClass(value: number) {
     return 'metric-fill';
 }
 
+function sparkColor(value: number) {
+    if (value >= 85) return 'var(--danger)';
+    if (value >= 65) return 'var(--warn)';
+    return 'var(--online)';
+}
+
+function buildSparkPath(values: number[], width: number, height: number) {
+    const stepX = width / (values.length - 1);
+    const points = values.map((v, i) => [
+        i * stepX,
+        height - (Math.min(100, Math.max(0, v)) / 100) * height
+    ]);
+    const line = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+    const area = `${line} L${width},${height} L0,${height} Z`;
+    return { line, area, last: points[points.length - 1] };
+}
+
+function Sparkline({ deviceId }: { deviceId: string }) {
+    const [points, setPoints] = useState<number[]>([]);
+    const width = 280;
+    const height = 40;
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function load() {
+            const res = await fetch(`/api/devices/${deviceId}/metrics?minutes=30`);
+            if (res.ok && !cancelled) {
+                const data: { cpu_usage: number }[] = await res.json();
+                setPoints(data.map((d) => d.cpu_usage));
+            }
+        }
+
+        load();
+        const interval = setInterval(load, 15000);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [deviceId]);
+
+    if (points.length < 2) {
+        return (
+            <div className="spark-wrap">
+                <div className="spark-label"><span>CPU · últimos 30min</span></div>
+                <div className="spark-empty">Coletando histórico...</div>
+            </div>
+        );
+    }
+
+    const spark = buildSparkPath(points, width, height);
+    const color = sparkColor(points[points.length - 1]);
+
+    return (
+        <div className="spark-wrap">
+            <div className="spark-label">
+                <span>CPU · últimos 30min</span>
+                <b>{points[points.length - 1]}%</b>
+            </div>
+            <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} preserveAspectRatio="none">
+                <line x1="0" y1={height * 0.25} x2={width} y2={height * 0.25} stroke="var(--border)" strokeWidth="1" />
+                <line x1="0" y1={height * 0.75} x2={width} y2={height * 0.75} stroke="var(--border)" strokeWidth="1" />
+                <path d={spark.area} fill={color} opacity="0.14" />
+                <path d={spark.line} fill="none" stroke={color} strokeWidth="1.6" />
+                <circle cx={spark.last[0]} cy={spark.last[1]} r="3" fill={color} />
+            </svg>
+        </div>
+    );
+}
+
 function timeAgo(iso: string) {
     const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
     if (seconds < 60) return `há ${seconds}s`;
@@ -207,6 +277,8 @@ export default function Dashboard() {
                             {d.uptime_seconds != null && (
                                 <div className="uptime-row">{formatUptime(d.uptime_seconds)}</div>
                             )}
+
+                            <Sparkline deviceId={d.id} />
 
                             <div className="metrics">
                                 <div className="metric-row">
