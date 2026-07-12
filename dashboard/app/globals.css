@@ -190,6 +190,26 @@ html, body {
     font-weight: 600;
 }
 
+.panel-clear {
+    font-family: inherit;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.15s ease;
+}
+
+.panel-clear:hover {
+    color: var(--accent);
+}
+
+.alert-list {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
 .alert-row {
     display: flex;
     align-items: flex-start;

@@ -248,6 +248,13 @@ export default function Dashboard() {
         setDevices((prev) => prev.map((d) => (d.id === id ? { ...d, tag } : d)));
     }
 
+    async function handleClearAlerts() {
+        const res = await fetch('/api/alerts', { method: 'DELETE' });
+        if (res.ok) {
+            setAlerts((prev) => prev.filter((a) => !a.resolved_at));
+        }
+    }
+
     const onlineCount = devices.filter((d) => d.status === 'ONLINE').length;
     const offlineCount = devices.length - onlineCount;
     const activeAlertsCount = alerts.filter((a) => !a.resolved_at).length;
@@ -285,17 +292,20 @@ export default function Dashboard() {
                 <div className="panel">
                     <div className="panel-head">
                         <h2>Atividade recente</h2>
+                        <button className="panel-clear" onClick={handleClearAlerts}>Limpar atividade recente</button>
                     </div>
-                    {alerts.map((a) => (
-                        <div className="alert-row" key={a.id}>
-                            <span className={`alert-dot ${a.type === 'offline' ? 'bad' : ''}`} />
-                            <span className={`alert-msg ${a.resolved_at ? 'resolved' : ''}`}>
-                                <b>{a.device_id}</b> — {a.message}
-                                {a.resolved_at ? ' (resolvido)' : ''}
-                            </span>
-                            <span className="alert-when">{timeAgo(a.created_at)}</span>
-                        </div>
-                    ))}
+                    <div className="alert-list">
+                        {alerts.map((a) => (
+                            <div className="alert-row" key={a.id}>
+                                <span className={`alert-dot ${a.type === 'offline' ? 'bad' : ''}`} />
+                                <span className={`alert-msg ${a.resolved_at ? 'resolved' : ''}`}>
+                                    <b>{a.device_id}</b> — {a.message}
+                                    {a.resolved_at ? ' (resolvido)' : ''}
+                                </span>
+                                <span className="alert-when">{timeAgo(a.created_at)}</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 

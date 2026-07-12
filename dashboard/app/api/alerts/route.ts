@@ -46,3 +46,19 @@ export async function POST(req: NextRequest) {
 
     return new NextResponse(null, { status: 204 });
 }
+
+// "Limpar atividade recente" - apaga só os alertas já resolvidos. Os
+// ativos (problema ainda em curso) continuam aparecendo, senão some um
+// aviso que ainda é verdade.
+export async function DELETE() {
+    const { error } = await getSupabaseAdmin()
+        .from('alerts')
+        .delete()
+        .not('resolved_at', 'is', null);
+
+    if (error) {
+        return NextResponse.json({ error: 'db error' }, { status: 500 });
+    }
+
+    return new NextResponse(null, { status: 204 });
+}
