@@ -518,6 +518,7 @@ html, body {
     align-items: center;
     justify-content: center;
     background: var(--bg);
+    padding: 16px;
 }
 
 .login-card {
@@ -567,4 +568,38 @@ html, body {
     color: var(--offline);
     font-size: 12px;
     margin: 0;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+    .page {
+        padding: 20px 16px 40px;
+    }
+
+    .header {
+        gap: 12px;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .card-top {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .alert-row {
+        flex-wrap: wrap;
+    }
+
+    .alert-when {
+        width: 100%;
+        padding-left: 17px;
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 320px;
+    }
 }
