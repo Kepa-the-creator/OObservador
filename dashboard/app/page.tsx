@@ -27,6 +27,89 @@ type Alert = {
     resolved_at: string | null;
 };
 
+type AlertSettings = {
+    cpu_threshold: number;
+    ram_threshold: number;
+    disk_threshold: number;
+    sustain_minutes: number;
+};
+
+function SettingsPanel({ onClose }: { onClose: () => void }) {
+    const [form, setForm] = useState<AlertSettings | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+
+    useEffect(() => {
+        fetch('/api/settings')
+            .then((res) => res.json())
+            .then(setForm);
+    }, []);
+
+    async function handleSave() {
+        if (!form) return;
+        setSaving(true);
+        setSaved(false);
+        try {
+            const res = await fetch('/api/settings', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(form)
+            });
+            if (res.ok) {
+                setForm(await res.json());
+                setSaved(true);
+            }
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    function field(key: keyof AlertSettings, label: string, max: number) {
+        return (
+            <label className="settings-field">
+                <span>{label}</span>
+                <input
+                    type="number"
+                    className="input"
+                    min={1}
+                    max={max}
+                    value={form ? form[key] : ''}
+                    onChange={(e) => setForm((f) => f && { ...f, [key]: Number(e.target.value) })}
+                />
+            </label>
+        );
+    }
+
+    return (
+        <div className="panel">
+            <div className="panel-head">
+                <h2>Limites de alerta</h2>
+                <button className="panel-clear" onClick={onClose}>Fechar</button>
+            </div>
+            <div className="settings-body">
+                {!form ? (
+                    <p className="spark-empty">Carregando...</p>
+                ) : (
+                    <>
+                        <div className="settings-grid">
+                            {field('cpu_threshold', 'CPU acima de (%)', 100)}
+                            {field('ram_threshold', 'RAM acima de (%)', 100)}
+                            {field('disk_threshold', 'Disco acima de (%)', 100)}
+                            {field('sustain_minutes', 'Por pelo menos (min)', 60)}
+                        </div>
+                        <div className="settings-actions">
+                            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                                {saving ? 'Salvando...' : 'Salvar'}
+                            </button>
+                            {saved && <span className="settings-saved">Salvo!</span>}
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function TagEditor({
     deviceId,
     tag,
@@ -200,6 +283,7 @@ export default function Dashboard() {
     const [devices, setDevices] = useState<Device[]>([]);
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [filter, setFilter] = useState<string>('all');
+    const [showSettings, setShowSettings] = useState(false);
     const [, forceTick] = useState(0);
     const router = useRouter();
     const previousStatusRef = useRef<Record<string, 'ONLINE' | 'OFFLINE'>>({});
@@ -279,7 +363,12 @@ export default function Dashboard() {
                     </div>
                     <p className="subtitle">Monitoramento em tempo real</p>
                 </div>
-                <button className="btn" onClick={handleLogout}>Sair</button>
+                <div className="header-actions">
+                    <button className="btn" onClick={() => setShowSettings((v) => !v)}>
+                        {showSettings ? 'Fechar config.' : 'Config. de alerta'}
+                    </button>
+                    <button className="btn" onClick={handleLogout}>Sair</button>
+                </div>
             </div>
 
             <div className="summary-bar">
@@ -287,6 +376,8 @@ export default function Dashboard() {
                 <div className="summary-pill"><strong>{onlineCount}</strong> online</div>
                 <div className="summary-pill"><strong>{activeAlertsCount}</strong> alerta(s) ativo(s)</div>
             </div>
+
+            {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
 
             {alerts.length > 0 && (
                 <div className="panel">
