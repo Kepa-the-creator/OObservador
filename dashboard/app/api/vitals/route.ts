@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
 const METRICS_RETENTION_MS = 60 * 60 * 1000; // 1 hora de histórico
+const USAGE_CAP_SECONDS = 15; // teto por leitura, pra gap de reconexão não virar "tempo ligado"
 
 export async function POST(req: NextRequest) {
     const auth = req.headers.get('authorization') || '';
@@ -21,6 +22,20 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = getSupabaseAdmin();
+    const now = Date.now();
+
+    // Pega o last_seen antigo antes de sobrescrever, pra saber quanto tempo
+    // realmente se passou desde a última leitura (vira a base do relatório
+    // de uso semanal/mensal).
+    const { data: existing } = await admin
+        .from('devices')
+        .select('last_seen')
+        .eq('id', payload.id)
+        .maybeSingle();
+
+    const deltaSeconds = existing?.last_seen
+        ? Math.min(USAGE_CAP_SECONDS, Math.max(0, (now - new Date(existing.last_seen).getTime()) / 1000))
+        : 0;
 
     const { error } = await admin.from('devices').upsert({
         id: payload.id,
@@ -36,7 +51,7 @@ export async function POST(req: NextRequest) {
         is_charging: payload.isCharging,
         janela_ativa: payload.janelaAtiva,
         apps_abertos: payload.appsAbertos,
-        last_seen: new Date().toISOString()
+        last_seen: new Date(now).toISOString()
     });
 
     if (error) {
@@ -58,11 +73,43 @@ export async function POST(req: NextRequest) {
         admin.from('device_metrics')
             .delete()
             .eq('device_id', payload.id)
-            .lt('recorded_at', new Date(Date.now() - METRICS_RETENTION_MS).toISOString())
+            .lt('recorded_at', new Date(now - METRICS_RETENTION_MS).toISOString())
     ]);
 
     if (metricsError) console.error('metrics insert:', metricsError);
     if (cleanupError) console.error('metrics cleanup:', cleanupError);
+
+    if (deltaSeconds > 0) {
+        const today = new Date(now).toISOString().slice(0, 10);
+        const apps: string[] = (payload.appsAbertos || '')
+            .split(', ')
+            .map((a: string) => a.trim())
+            .filter((a: string) => a && a !== 'Área de Trabalho');
+
+        const usagePromises = [
+            admin.rpc('increment_device_daily_usage', {
+                p_device_id: payload.id,
+                p_date: today,
+                p_seconds: deltaSeconds
+            })
+        ];
+
+        if (apps.length > 0) {
+            usagePromises.push(
+                admin.rpc('increment_app_daily_usage_bulk', {
+                    p_device_id: payload.id,
+                    p_date: today,
+                    p_app_names: apps,
+                    p_seconds: deltaSeconds
+                })
+            );
+        }
+
+        const usageResults = await Promise.all(usagePromises);
+        for (const { error: usageError } of usageResults) {
+            if (usageError) console.error('daily usage:', usageError);
+        }
+    }
 
     try {
         await evaluateSustainedAlerts(admin, payload.id);

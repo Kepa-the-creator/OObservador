@@ -494,6 +494,25 @@ html, body {
     border-radius: 6px;
 }
 
+.report-links {
+    display: flex;
+    gap: 14px;
+    margin-top: 4px;
+}
+
+.report-link {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--border);
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.report-link:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
 .card-footer {
     margin-top: 14px;
     padding-top: 12px;

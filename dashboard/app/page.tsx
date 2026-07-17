@@ -481,6 +481,11 @@ export default function Dashboard() {
                                     : <span className="chip">Área de Trabalho</span>}
                             </div>
 
+                            <div className="report-links">
+                                <a className="report-link" href={`/api/devices/${d.id}/report?period=week`}>Relatório semanal</a>
+                                <a className="report-link" href={`/api/devices/${d.id}/report?period=month`}>Relatório mensal</a>
+                            </div>
+
                             <div className="card-footer">
                                 Atualizado {timeAgo(d.last_seen)}
                             </div>
